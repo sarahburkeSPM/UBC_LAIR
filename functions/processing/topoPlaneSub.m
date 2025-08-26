@@ -8,7 +8,7 @@ function [z_flat,comment] = topoPlaneSub(x,y,z,mask,n,plot)
     % z(double): topo image
     % mask(double): mask
     % n(integer): number of points to sample, the default number is 200
-    % plot(boolean): choose to plot the process of plane sub, the is default is F
+    % plot(boolean): choose to plot the process of plane sub, the default is F
 %%  Output parameters:
     % z_flatten(double): flattened image
 
