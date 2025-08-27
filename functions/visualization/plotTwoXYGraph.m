@@ -1,4 +1,4 @@
-function [f, plot_name, savefigpath, comment] = plotTwoXYGraph(LayoutCase, X1, Y1, Y2, savefigpath, X2)
+function [f, comment] = plotTwoXYGraph(LayoutCase, X1, Y1, Y2, X2)
 %This function plots a graph with two sets of X and Y. 
 % LayoutCase will determin the format of the graph this function generates.
 % If you need a specific format for your graph, which is not already in
@@ -12,7 +12,6 @@ function [f, plot_name, savefigpath, comment] = plotTwoXYGraph(LayoutCase, X1, Y
     X1
     Y1
     Y2
-    savefigpath {mustBeText} ="" %string, optional input
     X2 = X1 %optional input
  end
 
@@ -27,30 +26,22 @@ if numel(X2) ~= numel(Y2)
     error('X2 and Y2 must have the same number of elements.');
 end
 
-% When the savefigath is not specified, it will pop up a window for a user to select the folder where the figure is saved.
-if savefigpath == ""
-    savefigpath = uigetdir([],"Select a folder to save the figure");
-end
-
 % Create the figure and plot
  f = figure();
  plot(X1, Y1);
  hold on;
  plot(X2, Y2);
  [ax] = setGraphLayout(LayoutCase);
-
- plot_name = uniqueNamePrompt(strcat("average_",LayoutCase),"",savefigpath);
- savefig(f, strcat(savefigpath,"/",plot_name,".fig"))
  
  % Include details in the comment output 
  if isequal(X1, X2)
-    comment = sprintf("plotTwoXYGraph(%s:%s, %s:%s, Y2:%s), plotname=%s, savefigpath=%s", ...
+    comment = sprintf("plotTwoXYGraph(%s:%s, %s:%s, Y2:%s)", ...
                       ax.XLabel.String, mat2str(size(X1)), ...
                       strcat(ax.YLabel.String, "Y1"), mat2str(size(Y1)), ...
-                      mat2str(size(Y2)), plot_name, savefigpath);
+                      mat2str(size(Y2)));
  else
-    comment = sprintf("plotTwoXYGraph(%s:%s, %s:%s, Y2:%s, X2:%s), plotname=%s, savefigpath=%s", ...
+    comment = sprintf("plotTwoXYGraph(%s:%s, %s:%s, Y2:%s, X2:%s)", ...
                       ax.XLabel.String, mat2str(size(X1)), ...
                       strcat(ax.YLabel.String, "Y1"), mat2str(size(Y1)), ...
-                      mat2str(size(Y2)), mat2str(size(X2)), plot_name, savefigpath);
+                      mat2str(size(Y2)), mat2str(size(X2)));
 end
