@@ -98,32 +98,45 @@ open(v);
 fig = figure('Name', sprintf('3D Grid View - %s Range, %s Colormap', rangeType, colormapName));
 ax = axes(fig);
 
+% Display progress bar window
+progressMsg = sprintf("Note: Video not displayed at set framerate! \n \n Writing video frame by frame: [%i/%i].", 0, size(data, 3));
+progressFig = waitbar(0,progressMsg, 'Name',"Video writer progress");
+
+% Number of frames 
+frameNum = size(data, 3);
 
 if croppedVid == 1
     %plot only image
     fig.Position = [100 100 videoSize(1)+250 videoSize(1)+250];
     ax.Units = "pixels";
     ax.Position = [125 125 videoSize(1) videoSize(2)];
-    for k = 1:size(data, 3)
+    for k = 1:frameNum
         img = imshow(squeeze(sliced_grid(:,:,k,:)), 'InitialMagnification', 'fit');
         setGraphLayout('gridsliceImage');
         frame = getframe;
         writeVideo(v,frame);
+        % update progress bar window
+        progressMsg = sprintf("Note: Video not displayed at set framerate! \n \n Writing video frame by frame: [%i/%i].", k, frameNum);
+        waitbar(k/frameNum,progressFig,progressMsg);
     end
 else
     %plot image with voltag text overlay
     fig.Position = [100 100 videoSize(1) videoSize(2)];
-    for k = 1:size(data, 3)
+    for k = 1:frameNum
         img = imshow(squeeze(sliced_grid(:,:,k,:)), 'InitialMagnification', 'fit');
         setGraphLayout('gridsliceImage');
         ax = imgca(fig);
         ax.Title.String = sprintf("%.3f V",V(k));
         frame = getframe(fig);
         writeVideo(v,frame);
+        % update progress bar window
+        progressMsg = sprintf("Note: Video not displayed at set framerate! \n \n Writing video frame by frame: [%i/%i].", k, frameNum);
+        waitbar(k/frameNum,progressFig,progressMsg)
     end
 end
 close(v);
 close(fig);
+close(progressFig);
 
 % LOG comment
 comment = sprintf("Grid video: <name> = %s saved in: <dir> = %s ", file, location);
