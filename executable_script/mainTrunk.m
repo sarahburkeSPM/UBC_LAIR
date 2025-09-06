@@ -71,7 +71,6 @@
 %Loading
     % LI01B Load-Initialize-01-B; Initialize log file, UI select path and name
     % LD01A Load-Data-01-A; Load data (grid, topo, ...) via UI file selection
-    % LS02A Load-Spectra-01-A; load grid and topo from Nanonis
     % SW01A Save-Workspace-01A; Save the current workspace
     % LW01A Load-Workspace-01A; Loads a saved workspace from a .mat file
 %Selecting
@@ -92,6 +91,7 @@
     % PC02A Processing-Correcting-02-A; correct the grid for drift 
     % PF01A Processing-Flatten-01-A; Subtracts the plane in topography images
     % PI03A Processing-Image-01-A; apply function to two images (add, subtract, ...)
+    % PI04A Processing-Image-04-A; align two 2D images
     
 %Visualizing
     % VT03A Visualize-Topo-03-A;  2D Image Plotting (topography or grid slice)
@@ -729,11 +729,11 @@ clearvars dataset variableIn1 variableIn2 variableOut1 variableOut2
 
 %presets:
 dataset = 'grid';           % specify the dataset to be used: e.g. grid
-variableIn1 = 'I_backward'; % specify the variable to be processed, e.g. I, I_smoothed, or I_backward
+variableIn1 = 'I_smoothed'; % specify the variable to be processed, e.g. I, I_smoothed, or I_backward
                             % this is a 3d array form (x, y, V)
 variableIn2 = 'V';          % specify the variable to be processed, e.g. V or Z
                             % this is a 1d array form (V, 1)
-variableOut1 = 'dIdV_bwd';      % specify the variable to return the data to
+variableOut1 = 'dIdV';      % specify the variable to return the data to
                             % this is a 3d array form (x, y, V-1)
 variableOut2 = 'V_reduced'; % specify the variable to return the data to
                             % this is a 1d array form (V-1, 1)
@@ -1077,10 +1077,8 @@ dataset = 'grid';           % specify which dataset to be used: e.g. grid
 variableIn1 = 'dIdV';       % specify the variable containing the dIdV data
 variableIn2 = 'V_reduced';  % specify the voltage axis for dIdV
 variableIn3 = [];           % optional: specify a mask to limit the plotted dIdV curves(i.e. `polygon_mask` )
-
-% Define the folder where the created figure to be saved
-savefigpath = '';           % If you choose '', it will pop up a window for a user to select the folder to save the figure.
-                            % Or you can just directly put a path here: e.g. savefigpat = LOGpath. This must be string.
+% save plot boolean
+saveplot = true;          % option to save the created plot (True: save; False: no save)
 
 % Define plot parameters
 LayoutCase = "transparent_dIdV";  % layout case for the plot
@@ -1109,29 +1107,51 @@ end
 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
 
-
-% Call transparentLinePlot function
-[figName, comment] = transparentLinePlot(savefigpath, ...
-    data.(dataset).(variableIn1), ...
-    data.(dataset).(variableIn2), ...
-    mask, ...
-    avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
-    0, ... % don't suppress saving
-    LayoutCase, ...
-    transp, ...
-    lwidth1, ...
-    lwidth2, ...
-    pcolorb_raw, ...
-    pcolorb_avg);
-
-% Log the execution of the function
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
-
-% Create a copy of the log corresponding to the saved figure
-saveUsedBlocksLog(LOGpath, LOGfile, savefigpath, figName);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    % Call transparentLinePlot function
+    [figName, comment] = transparentLinePlot(targetFolder, ...
+        data.(dataset).(variableIn1), ...
+        data.(dataset).(variableIn2), ...
+        mask, ...
+        avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
+        0, ... % don't suppress saving
+        LayoutCase, ...
+        transp, ...
+        lwidth1, ...
+        lwidth2, ...
+        pcolorb_raw, ...
+        pcolorb_avg);
+    
+    % Log the execution of the function
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",figName,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, figName);
+else
+     % Call transparentLinePlot function
+    [figName, comment] = transparentLinePlot(LOGpath, ...
+        data.(dataset).(variableIn1), ...
+        data.(dataset).(variableIn2), ...
+        mask, ...
+        avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
+        1, ... % suppress saving
+        LayoutCase, ...
+        transp, ...
+        lwidth1, ...
+        lwidth2, ...
+        pcolorb_raw, ...
+        pcolorb_avg);
+    
+    % Log the execution of the function
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
+end
 
 % Clear preset variables
-clearvars dataset variableIn1 variableIn2 variableIn3 variableIn4 savefigpath figName LayoutCase transp lwidth1 lwidth2 pcolorb_raw pcolorb_avg mask avg_dIdV;
+clearvars dataset variableIn1 variableIn2 variableIn3 variableIn4 
+clearvars targetFolder figName LayoutCase transp lwidth1 lwidth2 pcolorb_raw pcolorb_avg mask avg_dIdV;
 %% VS02A Visualize-Spectrum-02-A; allows you to click on a grid/topo and plot the spectra
 % Edited by: James Day January 2025, M. Altthaler June 2024, Vanessa October 2023
 % This section of the code opens a GUI that allows you to click
