@@ -96,9 +96,14 @@
 %Visualizing
     % VT03A Visualize-Topo-03-A;  2D Image Plotting (topography or grid slice)
     % VS01A Visualize-Spectrum-01-A; plot average I-V or average dI/dV
+    % VS01B Visualize-Spectrum-01-B; plot all dIdV curves with average dIdV
     % VS02A Visualize-Spectrum-02-A; allows you to click on a grid/topo and plot the spectra
     % VS04A Visualize-Spectra-04-A: Unified Plotting of I/V and dI/dV Profiles
+    % VS05A Visualize-Spectra-05-A; Visualizes spectra from directional mask
+    % VS06A Visualize-Spectra-06-A; Visualizes spectra from directional mask along a line
     % VG01A Visualize-Grid-01-A: gridslice viewer for all grids (including the non-square one)
+    % VG02A Visualize-Grid-02-A; Export grid to video file
+    % VP01A Visualize-Profile-01-A; Plots a profile of width along a UI selected line
 %Retired
     % R-LI01A Load-Initialize-01-A; Initializing the log file and choosing the data
     % R-LG01A Load-Grid-01-A; load grid 
