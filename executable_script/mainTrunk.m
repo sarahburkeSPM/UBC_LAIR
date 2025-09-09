@@ -71,7 +71,6 @@
 %Loading
     % LI01B Load-Initialize-01-B; Initialize log file, UI select path and name
     % LD01A Load-Data-01-A; Load data (grid, topo, ...) via UI file selection
-    % LS02A Load-Spectra-01-A; load grid and topo from Nanonis
     % SW01A Save-Workspace-01A; Save the current workspace
     % LW01A Load-Workspace-01A; Loads a saved workspace from a .mat file
 %Selecting
@@ -92,13 +91,19 @@
     % PC02A Processing-Correcting-02-A; correct the grid for drift 
     % PF01A Processing-Flatten-01-A; Subtracts the plane in topography images
     % PI03A Processing-Image-01-A; apply function to two images (add, subtract, ...)
+    % PI04A Processing-Image-04-A; align two 2D images
     
 %Visualizing
     % VT03A Visualize-Topo-03-A;  2D Image Plotting (topography or grid slice)
     % VS01A Visualize-Spectrum-01-A; plot average I-V or average dI/dV
+    % VS01B Visualize-Spectrum-01-B; plot all dIdV curves with average dIdV
     % VS02A Visualize-Spectrum-02-A; allows you to click on a grid/topo and plot the spectra
     % VS04A Visualize-Spectra-04-A: Unified Plotting of I/V and dI/dV Profiles
+    % VS05A Visualize-Spectra-05-A; Visualizes spectra from directional mask
+    % VS06A Visualize-Spectra-06-A; Visualizes spectra from directional mask along a line
     % VG01A Visualize-Grid-01-A: gridslice viewer for all grids (including the non-square one)
+    % VG02A Visualize-Grid-02-A; Export grid to video file
+    % VP01A Visualize-Profile-01-A; Plots a profile of width along a UI selected line
 %Retired
     % R-LI01A Load-Initialize-01-A; Initializing the log file and choosing the data
     % R-LG01A Load-Grid-01-A; load grid 
@@ -376,17 +381,17 @@ clearvars dataset variableIn1 variableOut
 % PRESETS:
 % data in: 
 dataset = 'grid';           % specify the dataset to be used: e.g. grid
-variableIn1 = 'I';          % specify the variable to be processed 
+variableIn1 = 'dIdV';          % specify the variable to be processed 
 % masks out:
 variableOut = 'directional_masks';     % specify the variable name to store the masks
 % save plot boolean
-saveplots = false;          % option to save plots (True: save; False: no save)
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
 % Relevant inputs for slicing 3D -> 2D data:
 n = 52;                    % slice number (n-th index of 3rd dim of data) [variableIn2 optional]
-variableIn2 = 'V';          % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
+variableIn2 = 'V_reduced';          % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
 imageV = [];                % target voltage -> closest value in variableIn2 is chosen [requires variableIn2]
 % optional to force a connected main line
 connected = [];              % flag for side connectivity in mask generation [1 = true, 0 = false]
@@ -412,21 +417,21 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
 [data.(dataset).(variableOut), data.(dataset).([variableOut '_combined']), figMasks, LOGcomment] = maskDirectionalB(data.(dataset).(variableIn1),n,data.(dataset).(variableIn2),imageV,connected,startPoint,endPoint,width,bin_size, bin_sep);
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
 
-if saveplots==true
-    %ask for plotname:
-    plot_name = uniqueNamePrompt("Directional mask","",LOGpath);
-    LOGcomment = strcat(LOGcomment,sprintf(", plotname=%s",plot_name));
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("Directional mask","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
     LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
     
     %save the created figures here:
-    savefig(figMasks,strcat(LOGpath,"/",plot_name,".fig"))
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
     %create copy of the log corresponding to the saved figures
-    saveUsedBlocksLog(LOGpath, LOGfile, LOGpath, plot_name);
-else
-    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
 end
 % Clean up variables
-clearvars dataset variableIn1 variableOut saveplots n variableIn2 imageV connected startPoint endPoint width bin_size bin_sep inputData
+clearvars dataset variableIn1 variableOut saveplots n variableIn2 imageV connected 
+clearvars startPoint endPoint width bin_size bin_sep inputData targetFolder plot_name
 %% SM02A Selecting-Mask-02-A; circular mask
 
 % Edited by Jiabin May 2024; Jisun Oct 2023, again in Feb 2024, again in Dec 2024.
@@ -437,6 +442,8 @@ clearvars dataset variableIn1 variableOut saveplots n variableIn2 imageV connect
 dataset ='grid';            % specify the dataset to be used: e.g. grid
 variableIn1 = 'I';       % specify the data (2D or 3D) to use to create the mask
 radius = 3;                 % radius R: the size of the circular mask
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
@@ -461,19 +468,18 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "SM02A", LOGcomment ,0);
 % log the function of excuation 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
 
-% Ask for dir of saving `figure` and the name 
-targetFolder = uigetdir([],'Choose folder to save the figure to:');
-plot_name = uniqueNamePrompt("circular mask","",targetFolder);
-
-% LOG dir/plotname.fig
-LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("circular mask","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
     
-% save the figures
-savefig(strcat(targetFolder,"/",plot_name,".fig"));
-
-% function: SaveUsedBlocks
-saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, strcat(plot_name));
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 % clear excess variables
 clearvars dataset variableIn1 variableIn2 variableOut1 variableOut2
@@ -487,13 +493,15 @@ clearvars imageV radius targetFolder plot_name
 
 % presets:
 dataset ='grid';              %specify the dataset to be used: e.g. grid
-variableIn1 = 'I';         % specify the data (2D or 3D) to use to create the mask
+variableIn1 = 'dIdV';         % specify the data (2D or 3D) to use to create the mask
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
 % Relevant inputs for slicing 3D -> 2D data:
 n = 113;                         % slice number (n-th index of 3rd dim of data) [variableIn2 optional]
-variableIn2 = 'V';      % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
+variableIn2 = 'V_reduced';      % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
 imageV = [];                 % target voltage -> closest value in variableIn2 is chosen [requires variableIn2]
 
 % return variables:
@@ -512,19 +520,18 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "SM03A", LOGcomment ,0);
 % log the function of excuation 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
 
-% Ask for dir of saving `figure` and the name 
-targetFolder = uigetdir([],'Choose folder to save the figure to:');
-plot_name = uniqueNamePrompt("rectangular mask","",targetFolder);
-
-% LOG dir/plotname.fig
-LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("rectangular mask","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
     
-% save the figures
-savefig(strcat(targetFolder,"/",plot_name,".fig"));
-
-% function: SaveUsedBlocks
-saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, strcat(plot_name));
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 % clear excess variables
 clearvars dataset variableIn1 variableIn2 variableOut1 variableOut2
@@ -536,14 +543,15 @@ clearvars imageV targetFolder plot_name
 
 % presets:
 dataset ='grid';                %specify the dataset to be used: e.g. grid or topo
-variableIn1 = 'I';           % specify the data (2D or 3D) to use to create the mask
-plot_histograms = true;         % true if you would like to see the intermediate histogram to help choose your desired threshold value; false if not
+variableIn1 = 'dIdV';           % specify the data (2D or 3D) to use to create the mask
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
 % Relevant inputs for slicing 3D -> 2D data:
 n = 111;                         % slice number (n-th index of 3rd dim of data) [variableIn2 optional]
-variableIn2 = 'V';      % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
+variableIn2 = 'V_reduced';      % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
 imageV = [];                  % target voltage -> closest value in variableIn2 is chosen [requires variableIn2]
                                 
 % return variables: 
@@ -556,21 +564,25 @@ LOGcomment = sprintf("DataIn: dataset = %s, variableIn1 = %s, variableIn2 = %s, 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "SM04A", LOGcomment ,0);
 
 %function execution
-[data.(dataset).(variableOut), LOGcomment] = getThreshold(data.(dataset).(variableIn1), plot_histograms, n, optionalStructCall(data, dataset,variableIn2), imageV);
-
-%ask for plotname:
-plot_name = uniqueNamePrompt("Threshold","",LOGpath);
-LOGcomment = strcat(LOGcomment,sprintf(", plotname=%s",plot_name));
+[data.(dataset).(variableOut), LOGcomment] = getThreshold(data.(dataset).(variableIn1), true, n, optionalStructCall(data, dataset,variableIn2), imageV);
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
 
-%save the created figures here:
-savefig(strcat(LOGpath,"/",plot_name,".fig"))
-%create copy of the log corresponding to the saved figures
-saveUsedBlocksLog(LOGpath, LOGfile, LOGpath, plot_name);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("threshold","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+    
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 %clear variables
 clearvars dataset variableIn1 variableIn2 variableOut n imageV
-clear plot_name
+clear plot_name targetFolder
 
 %% SM05A Selecting-Mask-03-A; polygon mask
 % Edited by M. Altthaler 2025/02
@@ -579,13 +591,15 @@ clear plot_name
 
 % presets:
 dataset ='grid';                %specify the dataset to be used: e.g. grid
-variableIn1 = 'I';              % specify the data (2D or 3D) to use to create the mask
+variableIn1 = 'dIdV';              % specify the data (2D or 3D) to use to create the mask
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
 % Relevant inputs for slicing 3D -> 2D data:
 n = 111;                         % slice number (n-th index of 3rd dim of data) [variableIn2 optional]
-variableIn2 = 'V';              % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
+variableIn2 = 'V_reduced';              % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
 imageV = [];                  % target voltage -> closest value in variableIn2 is chosen [requires variableIn2]
                                 
 positionsIn = [];               % list of points for the polygon in the format: [x1 y1; x2 y2; ...; xn yn]; 
@@ -606,6 +620,19 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "SM05A", LOGcomment ,0);
 
 % log the function of excuation 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("polygon mask","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+    
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 % clear excess variables
 clearvars dataset variableIn1 variableIn2 variableOut1 variableOut2 n imageV positionsIn
@@ -639,7 +666,7 @@ clearvars dataset variableIn variableOut span
 % Presets
 % Define dataset and input/output variables here
 dataset = 'grid';               % specify the dataset to be used: e.g., grid
-variableIn1 = 'dIdV';     % the variable that you want to average. e.g. I_forward, I_backward
+variableIn1 = 'dIdV_bwd';     % the variable that you want to average. e.g. I_forward, I_backward
                                 % If you want to average dIdV, you need to run PD01A or PD01B first. 
                                 % Also you can input dIdV_forward or dIdV_backward to get average 
                                 % of foward or backward only average dIdV.
@@ -650,9 +677,9 @@ variableIn2 = [];  % If you want to average I-V or dIdV only in the masked area,
                                % e.g. run SM05A and set the variableIn2 as 'polygon_mask'.
 
 % return variables:
-variableOut1 = 'avg_dIdV';      % specify the first output variable. e.g. avg_dIdV or avg_IV_fwd or avg_IV_bwd
+variableOut1 = 'avg_dIdV_bwd';      % specify the first output variable. e.g. avg_dIdV or avg_IV_fwd or avg_IV_bwd
                                 % or avg_dIdV_fwd or avg_dIdV_bwd
-variableOut2 = 'dIdV_STD';      %standard deviation
+variableOut2 = 'dIdV_STD_bwd';      %standard deviation
 %%%%%%%%%%%%%%%%%% DO NOT EDIT BELOW %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Log input and output variables
 LOGcomment = sprintf("DataIn: dataset = %s, variableIn1 = %s, variableIn2 = %s; DataOut: variableOut1 = %s, variableOut2 = %s", ...
@@ -707,7 +734,7 @@ clearvars dataset variableIn1 variableIn2 variableOut1 variableOut2
 
 %presets:
 dataset = 'grid';           % specify the dataset to be used: e.g. grid
-variableIn1 = 'I'; % specify the variable to be processed, e.g. I, I_smoothed, or I_backward
+variableIn1 = 'I_smoothed'; % specify the variable to be processed, e.g. I, I_smoothed, or I_backward
                             % this is a 3d array form (x, y, V)
 variableIn2 = 'V';          % specify the variable to be processed, e.g. V or Z
                             % this is a 1d array form (V, 1)
@@ -785,6 +812,8 @@ variableTopoAfter ='z';             %specify the variable to be processed: e.g. 
 datasetOut ='grid';                 %specify the dataset to return the data to: e.g. grid 
 variableOut ='I_driftCorr';         %specify the variable to return the data to: e.g. I (overwrite data) or I_smoothed
 theta = 0;                          %angle to rotate the grid (in degrees)
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 %%%%%%%%%%%%%%%%%% DO NOT EDIT BELOW %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %LOG data in/out:
@@ -795,17 +824,19 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "PC02A", LOGcomment ,0);
 [data.(datasetOut).(variableOut),LOGcomment] = driftCorrection(data.(datasetGrid).(variableGrid), data.(datasetTopoBefore).(variableTopoBefore), data.(datasetTopoAfter).(variableTopoAfter), theta);
 %LOG function call
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
-%ask for plotname and the folder it should be saved in:
-targetFolder = uigetdir([],'Choose folder to save the figure to:');
-plot_name = uniqueNamePrompt("driftCorrected","",targetFolder);
-%LOG saved figure name and dir
-LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
 
-%save the created figures here:
-savefig(strcat(targetFolder,"/",plot_name,".fig"))
-%create copy of the log corresponding to the saved figures
-saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("driftCorrected","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+    
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 %clear excess variables that may create issues in other blocks
 clearvars datasetGrid variableGrid datasetTopoBefore variableTopoBefore datasetTopoAfter variableTopoAfter datasetOut variableOut
@@ -820,9 +851,11 @@ dataset = 'topo'; %specify the dataset to be used
 variableIn1= 'x'; % (array) x axis
 variableIn2 = 'y'; % (array) y axis
 variableIn3 = 'z'; % (array) data
-variableIn4 = 'circular_mask'; % optional mask to fit plane to. If no mask desired then variableIn4=''
+variableIn4 = ''; % optional mask to fit plane to. If no mask desired then variableIn4=''
 n = 100; %integer: number of points to sample. Default 200
-plot = 1; %boolean: chose to plot the process or not (0: no plot, 1: plot)
+% save plot boolean
+plot = 1;          % option to plot the result and save the created plot (1: save; 0: no save)
+
 variableOut = 'z_flat'; % (array) flattened z data
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%% DO NOT EDIT BELOW %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -836,24 +869,23 @@ if isempty(variableIn4)
 else
     [data.(dataset).(variableOut), LOGcomment] = topoPlaneSub(data.(dataset).(variableIn1), data.(dataset).(variableIn2), data.(dataset).(variableIn3), data.(dataset).(variableIn4), n, plot);
 end
-%plot if desired and LOG data in/out:
+LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+
 if plot
-    %ask for plotname:
-    plot_name = uniqueNamePrompt("PlaneSub","",LOGpath);
-    LOGcomment = strcat(LOGcomment,sprintf(", plotname=%s",plot_name));
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt("PlaneSub","",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
     LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+
     %save the created figures here:
-    savefig(strcat(LOGpath,"/",plot_name,".fig"))
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
     %create copy of the log corresponding to the saved figures
-    saveUsedBlocksLog(LOGpath, LOGfile, LOGpath, plot_name);
-    clear plot_name;
-else
-    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
 end
 %clear variables
 clearvars dataset variableIn1 variableIn2 variableIn3 variableOut
-clearvars n plot
-clearvars plotname
+clearvars n plot_name targetFolder
 
 %% PI03A Processing-Image-01-A; apply function to two images (add, subtract, ...)
 % Edited by M. Altthaler 2025/04
@@ -952,6 +984,8 @@ clearvars datasetBefore datasetAfter variableInBefore variableInAfter scaling va
 LayoutCase = 'gridsliceImage';   % specify the layout format: gridsliceImage or topoImage
 dataset = 'grid';           % specify the dataset to be used: e.g. grid, topo
 variableIn1 = 'dIdV';           % specify the variable containing the data to be plotted: e.g. z, dIdV
+% save plot boolean
+saveplot = false;          % option to save the created plot (True: save; False: no save)
 
 % optional variable inputs
 % set values to [] if not used
@@ -960,10 +994,6 @@ n = [];                         % slice number (n-th index of 3rd dim of data) [
 variableIn2 = 'V_reduced';      % Voltage axis for the 3D data set: e.g. 'V_reduced' for dIdV or 'V' for I(V)
 imageV = 0.02;  
 
-% define the folder where the created figure to be saved
-savefigpath = '';   % If you choose '', it will pop up a window for a user to select the folder to save the figure.
-                    % Or you can just directly put a path here: e.g. savefigpat = LOGpath. This must be string.
-
 %%%%%%%%%%%%%%%%%% DO NOT EDIT BELOW %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % LOG data in/out
@@ -971,24 +1001,26 @@ LOGcomment = sprintf("LayoutCase = %s; dataset = %s; variableIn1 = %s; n = %s; v
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "VT03A", LOGcomment, 0);
 
 % Execute the function
-[data.(dataset).figureHandle, data.(dataset).plotName, data.(dataset).savePath, LOGcomment] = plot2DImage(LayoutCase, data.(dataset).(variableIn1), savefigpath, n, optionalStructCall(data, dataset,variableIn2), imageV);
+[data.(dataset).figureHandle, LOGcomment] = plot2DImage(LayoutCase, data.(dataset).(variableIn1), n, optionalStructCall(data, dataset,variableIn2), imageV);
 
 % Log the execution of the function
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
 
-% Save the figure
-savefigpath = data.(dataset).savePath;
-plot_name = data.(dataset).plotName;
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt(strcat(LayoutCase),"",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
 
-% LOG dir/plotname.fig
-LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", savefigpath, plot_name);
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
-
-% Save the figure path to log
-saveUsedBlocksLog(LOGpath, LOGfile, savefigpath, strcat(plot_name));
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end
 
 % Clear excess variables
-clearvars LayoutCase dataset variableIn savefigpath plot_name
+clearvars LayoutCase dataset variableIn plot_name targetFolder
 
 %% VS01A Visualize-Spectrum-01-A; plot average I-V or average dI/dV
 % Edited by Jisun Kim Oct 2023, again in Feb 2024, Dong Chen June 2024, Jisun Kim July and Dec 2024
@@ -1001,17 +1033,15 @@ dataset = 'grid';           % specify which dataset to be used: e.g. grid
 variableIn1 = 'V_reduced';  % specify the first input variable, x axis. V for I-V plot and V_reduced for dIdV plot
 variableIn2 = 'avg_dIdV';   % specify the second input variable, y axis: e.g. avg_IV or avg_dIdV. You need to run PA02A first. 
                           % Match it to what you process in PA02A.
+LayoutCase = 'dIdV'; % Both LayoutCase 'IV_fwdbwd' and 'dIdV_fwdbwd' assume that variableIn2 is for fwd and varialbeIn3 for bwd.
+                            % If you put bwd data as varialbeIn2 and fwd data as variableIn3, the label will be incorrect (reversed).
+% save plot boolean
+saveplot = true;          % option to save the created plot (True: save; False: no save)
 
 % optional variable input, set value to [] if not used
-variableIn3 = [];    % If you want to plot forward and backward separtely but together in one plot, varialbeIn2 and variableIn3 should be 
+variableIn3 = 'avg_dIdV_bwd';    % If you want to plot forward and backward separtely but together in one plot, varialbeIn2 and variableIn3 should be 
                      % specified accordingly. e.g. variableIn2 = avg_IV, variableIn3 = avg_IV_bwd; variableIn2 = avg_dIdV, variableIn3 = avg_dIdV_bwd.                          
 
-% define the folder where the created figure to be saved
-savefigpath = '';   % If you choose '', it will pop up a window for a user to select the folder to save the figure.
-                    % Or you can just directly put a path here: e.g. savefigpat = LOGpath. This must be string.
-
-LayoutCase = 'dIdV'; % Both LayoutCase 'IV_fwdbwd' and 'dIdV_fwdbwd' assume that variableIn2 is for fwd and varialbeIn3 for bwd.
-                            % If you put bwd data as varialbeIn2 and fwd data as variableIn3, the label will be incorrect (reversed). 
 %%%%%%%%%%%%%%%%%% DO NOT EDIT BELOW %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Log input and output variables 
 LOGcomment = sprintf("DataIn: dataset = %s, variableIn1 = %s, variableIn2 = %s, variableIn3 = %s",...
@@ -1020,23 +1050,28 @@ LOGcomment = logUsedBlocks(LOGpath, LOGfile, "VS01A", LOGcomment, 0);
 
 if isempty(variableIn3)
     % This makes the averaged "I versus V" plot
-    [~, plot_name_1, savefigpath, LOGcomment] = plotOneXYGraph(LayoutCase, data.(dataset).(variableIn1), data.(dataset).(variableIn2), savefigpath);
+    [~, LOGcomment] = plotOneXYGraph(LayoutCase, data.(dataset).(variableIn1), data.(dataset).(variableIn2));
     LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
-
-    % create a copy of the log corresponding to the saved figure
-    saveUsedBlocksLog(LOGpath, LOGfile, savefigpath, plot_name_1);
-
 else
     % This plots "avg_IV_fwd vs V" and "avg_IV_bwd vs V" in one graph
-    [~, plot_name_2, savefigpath, LOGcomment] = plotTwoXYGraph(LayoutCase, data.(dataset).(variableIn1),data.(dataset).(variableIn2), data.(dataset).(variableIn3), savefigpath);
+    [~, LOGcomment] = plotTwoXYGraph(LayoutCase, data.(dataset).(variableIn1),data.(dataset).(variableIn2), data.(dataset).(variableIn3));
     LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
-    
-    % create a copy of the log corresponding to the saved figure
-    saveUsedBlocksLog(LOGpath, LOGfile, savefigpath, plot_name_2);
 end
-  
+
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    plot_name = uniqueNamePrompt(strcat("average_",LayoutCase),"",targetFolder);
+    LOGcomment = sprintf("Figure saved as (<dir>/<plotname>.fig): %s/%s.fig", targetFolder, plot_name);
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment ,0);
+
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",plot_name,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, plot_name);
+end  
 % Clear preset variables
-clearvars dataset variableIn1 variableIn2 variableIn3 savefigpath plot_name_1 plot_name_2 LayoutCase;
+clearvars dataset variableIn1 variableIn2 variableIn3 plot_name LayoutCase targetFolder;
 %% VS01B Visualize-Spectrum-01-B; plot all dIdV curves with average dIdV
 % This section of code plots all dIdV curves with transparency and their average on top.
 % If a mask is provided, only plots dIdV curves within the masked area and recalculates the average.
@@ -1047,10 +1082,8 @@ dataset = 'grid';           % specify which dataset to be used: e.g. grid
 variableIn1 = 'dIdV';       % specify the variable containing the dIdV data
 variableIn2 = 'V_reduced';  % specify the voltage axis for dIdV
 variableIn3 = [];           % optional: specify a mask to limit the plotted dIdV curves(i.e. `polygon_mask` )
-
-% Define the folder where the created figure to be saved
-savefigpath = '';           % If you choose '', it will pop up a window for a user to select the folder to save the figure.
-                            % Or you can just directly put a path here: e.g. savefigpat = LOGpath. This must be string.
+% save plot boolean
+saveplot = true;          % option to save the created plot (True: save; False: no save)
 
 % Define plot parameters
 LayoutCase = "transparent_dIdV";  % layout case for the plot
@@ -1079,29 +1112,51 @@ end
 
 LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", LOGcomment, 0);
 
-
-% Call transparentLinePlot function
-[figName, comment] = transparentLinePlot(savefigpath, ...
-    data.(dataset).(variableIn1), ...
-    data.(dataset).(variableIn2), ...
-    mask, ...
-    avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
-    0, ... % don't suppress saving
-    LayoutCase, ...
-    transp, ...
-    lwidth1, ...
-    lwidth2, ...
-    pcolorb_raw, ...
-    pcolorb_avg);
-
-% Log the execution of the function
-LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
-
-% Create a copy of the log corresponding to the saved figure
-saveUsedBlocksLog(LOGpath, LOGfile, savefigpath, figName);
+if saveplot==true
+    % Ask for dir of saving `figure` and the name
+    targetFolder = uigetdir([],'Choose folder to save the figure to:');
+    % Call transparentLinePlot function
+    [figName, comment] = transparentLinePlot(targetFolder, ...
+        data.(dataset).(variableIn1), ...
+        data.(dataset).(variableIn2), ...
+        mask, ...
+        avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
+        0, ... % don't suppress saving
+        LayoutCase, ...
+        transp, ...
+        lwidth1, ...
+        lwidth2, ...
+        pcolorb_raw, ...
+        pcolorb_avg);
+    
+    % Log the execution of the function
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
+    %save the created figures here:
+    savefig(strcat(targetFolder,"/",figName,".fig"));
+    %create copy of the log corresponding to the saved figures
+    saveUsedBlocksLog(LOGpath, LOGfile, targetFolder, figName);
+else
+     % Call transparentLinePlot function
+    [figName, comment] = transparentLinePlot(LOGpath, ...
+        data.(dataset).(variableIn1), ...
+        data.(dataset).(variableIn2), ...
+        mask, ...
+        avg_dIdV, ...  % Use the appropriate average dIdV (either original or recalculated)
+        1, ... % suppress saving
+        LayoutCase, ...
+        transp, ...
+        lwidth1, ...
+        lwidth2, ...
+        pcolorb_raw, ...
+        pcolorb_avg);
+    
+    % Log the execution of the function
+    LOGcomment = logUsedBlocks(LOGpath, LOGfile, "  ^  ", comment, 0);
+end
 
 % Clear preset variables
-clearvars dataset variableIn1 variableIn2 variableIn3 variableIn4 savefigpath figName LayoutCase transp lwidth1 lwidth2 pcolorb_raw pcolorb_avg mask avg_dIdV;
+clearvars dataset variableIn1 variableIn2 variableIn3 variableIn4 
+clearvars targetFolder figName LayoutCase transp lwidth1 lwidth2 pcolorb_raw pcolorb_avg mask avg_dIdV;
 %% VS02A Visualize-Spectrum-02-A; allows you to click on a grid/topo and plot the spectra
 % Edited by: James Day January 2025, M. Altthaler June 2024, Vanessa October 2023
 % This section of the code opens a GUI that allows you to click
@@ -1356,9 +1411,9 @@ clearvars variableOut1 variableOut2 variableOut3 rangeChoice rangeType
 
 % Presets:
 dataset = 'grid';
-variableIn1 = 'I';
-variableIn2 = 'V';
-variableIn3 = 'invgray';    % Colormap: 'invgray' (default), 'jet', 'hot', 'gray', 'parula', or any valid MATLAB colormap
+variableIn1 = 'dIdV';
+variableIn2 = 'V_reduced';
+variableIn3 = 'gray';    % Colormap: 'invgray' (default), 'jet', 'hot', 'gray', 'parula', or any valid MATLAB colormap
 delay = 20;                 % delay in ms, i.e. 100ms -> 10 frames (layers) per second [range: 6ms-1000ms, yields 1-172 frames per second]
 croppedVideo = 0;           % 1: Crop plot to data only | 0: include axis labels and voltage (title) per frame
 videoSize = [600 600];      % Size of video in pixels (usually: n x n, e.g. 800 x 800)    
