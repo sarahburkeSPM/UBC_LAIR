@@ -88,10 +88,10 @@ channelSelection = selectChannels(defaultChannelSelection);
 
 % This section is to determine if we have a partial image and remove 0 values if so. 
 % Note this wasn't necessary for x or V since they're always full
-[~,y_coordinates] = find(all(data{1, 1}(3, 1))); %pixels where there are spectra
+[~,y_coordinates] = find(~cellfun(@isempty, data)); %pixels where there are spectra
 
 % Check if grid is finished
-finished = all(data{1, 1}(:, 1),'all');
+finished = ~any(cellfun(@isempty, data), "all");
 
 if finished
     grid.y = y_all;
