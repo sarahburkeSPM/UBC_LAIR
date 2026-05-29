@@ -1,5 +1,6 @@
 function spectrum = load_spectrum_Nanonis(folder,spectrumFileName)
 %Wrapper load function for point spectrum '.dat' files
+%   V.K. - 2024, J.T. - 2026
 %   Uses specLoad.m function, processes the data into a structure 
 % Input: 
 %   folder: string of folder containing data
@@ -21,22 +22,50 @@ end
 spectrum.header = header;
 spectrum.header.channels = channels;
 
-%Get the channels from the data: 
+% Create array of default selected channels
 number_channels = size(data,1);
+defaultChannelSelection(number_channels) = struct('channelName', [], 'fieldName', [], 'selected', []);
+
 for channel = 1:number_channels
-    if spectrum.header.channels{channel} == "Current (A)"
-        spectrum.I = data(channel,:);
-    elseif spectrum.header.channels{channel} == "Bias calc (V)"
-        spectrum.V = data(channel,:);
-    elseif spectrum.header.channels{channel} == "LI Demod 1 X (A)"
-        spectrum.lock_in_x = data(channel,:);
-    elseif spectrum.header.channels{channel} == "LI Demod 1 Y (A)"
-        spectrum.lock_in_y = data(channel,:);
-    else
-        disp(strcat("Not saving channel ", spectrum.header.channels{channel}));
+    switch channels{channel}
+        case "Current (A)"
+            fieldName = "I";
+            selected = true;
+        case "Current [bwd] (A)"
+            fieldName = "I_backward";
+            selected = true;
+        case "Bias calc (V)"
+            fieldName = "V";
+            selected = true;
+        case "Bias calc [bwd] (V)"
+            fieldName = "V_backward";
+            selected = true;
+        case "LI Demod 1 X (A)"
+            fieldName = "lock_in_x";
+            selected = true;
+        case "LI Demod 1 Y (A)"
+            fieldName = "lock_in_y";
+            selected = true;
+        otherwise
+            fieldName = "";
+            selected = false;
     end
+
+    defaultChannelSelection(channel).channelName = channels{channel};
+    defaultChannelSelection(channel).fieldName = fieldName;
+    defaultChannelSelection(channel).selected = selected;
 end
 
+% Prompt user to select channels to load
+channelSelection = selectChannels(defaultChannelSelection);
+
+%Get the selected channels from the data:
+for channel = 1:number_channels
+    if channelSelection(channel).selected
+        fieldName = channelSelection(channel).fieldName;
+        spectrum.(fieldName) = data(channel,:);
+    end
+end
 
 end
 
