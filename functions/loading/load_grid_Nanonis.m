@@ -108,7 +108,9 @@ for channel = 1:number_channels
 
         for x = 1:number_x_points
             for y = 1:number_y_points
-                gridDataAll(x,y,:) = data{x,y}(:,channel);
+                if ~isempty(data{x,y})
+                    gridDataAll(x,y,:) = data{x,y}(:,channel);
+                end
             end
         end
 
