@@ -1,6 +1,6 @@
 function topo = load_topo_Nanonis(folder, topoFileName)
 %Wrapper function for loading topos from Nanonis
-%   V.K. - 2024
+%   V.K. - 2024, J.T. - 2026
 %   Uses the Nanonis-made loadsxm.m function, processes the data into a structure 
 %   Known possible channels: 'Z', 'Current', and 'LI_D1_X_1_omega'.
 %   One extra channel of unknown name will be saved as 'other_channel'.
@@ -54,107 +54,80 @@ topo.y_position = header.scan_offset(2);
 channels = topo.header.data_info{:,'Name'};
 number_channels = height(topo.header.data_info);
 
+% Create array of default selected channels
+defaultChannelSelection(number_channels) = struct('channelName', [], 'fieldName', [], 'selected', []);
+
+for channel = 1:number_channels
+    switch channels{channel}
+        case "Z"
+            fieldName = "z";
+            selected = true;
+        case "Current"
+            fieldName = "I";
+            selected = true;
+        case "LI_D1_X_1_omega"
+            fieldName = "lock_in";
+            selected = true;
+        otherwise
+            fieldName = "";
+            selected = false;
+    end
+
+    defaultChannelSelection(channel).channelName = channels{channel};
+    defaultChannelSelection(channel).fieldName = fieldName;
+    defaultChannelSelection(channel).selected = selected;
+end
+
+% Prompt user to select channels to load
+channelSelection = selectChannels(defaultChannelSelection);
+
 % Reshape the raw data by channel and direction. Assumption is that both
 % directions are taken, and so there is 2 images per channel
 data = reshape(raw_data,[number_x_points,number_y_points,number_channels * 2]);
 
 %This section is to determine if we have a partial image and remove NaN
 %values if so. Note that this wasn't necessary for x since it's always full
+% find y pixels where there is data
+[~, y_coordinates] = find(~isnan(data(:,:,1)));
 
-%find y pixels where there is data
-for channel = 1:number_channels
-    if channels(channel) == "Z"
-        z_all = data(:,:,channel);
-    end
-end
-[~, y_coordinates] = find(~isnan(z_all));
+% Check if topo is unfinished
+unfinished = any(isnan(data(:,:,1)), 'all');
 
-
-%first check if the topo is finished 
-if ~any(isnan(z_all),'all') %we have a full topo
-    topo.y = y_all;
-    % Extract out the channels
-    for channel = 1:number_channels
-        if channels(channel) == "Z"
-            topo.z = data(:,:,2*channel-1);
-            topo.z_backward = data(:,:,2*channel);
-            %Apply orientation transformation
-            [topo.z, topo.z_backward] = sxmPermute(topo.z, topo.z_backward, topo.header.scan_dir);
-
-        elseif channels(channel) == "Current"
-            topo.I = data(:,:,2*channel-1);
-            topo.I_backward = data(:,:,2*channel);
-            %Apply orientation transformation
-            [topo.I, topo.I_backward] = sxmPermute(topo.I, topo.I_backward, topo.header.scan_dir);
-
-        elseif channels(channel) == "LI_D1_X_1_omega"
-            topo.lock_in = data(:,:,2*channel-1);
-            topo.lock_in_backward = data(:,:,2*channel);
-            %Apply orientation transformation
-            [topo.lock_in, topo.lock_in_backward] = sxmPermute(topo.lock_in, topo.lock_in_backward, topo.header.scan_dir);
-
-        else
-            topo.other_channel = data(:,:,2*channel-1);
-            topo.other_channel_backward = data(:,:,2*channel);
-            %Apply orientation transformation
-            [topo.other_channel, topo.other_channel_backward] = sxmPermute(topo.other_channel, topo.other_channel_backward, topo.header.scan_dir);
-
-        end
-    end
-
-else % we have an unfinished topo
+if unfinished
     topo.y_all = y_all;
     topo.y = topo.y_all(1:max(y_coordinates)-1);
+else
+    topo.y = y_all;
+end
 
-    %Extract out the channels
-    for channel = 1:number_channels
-        if channels(channel) == "Z"
-            topo.z_all = data(:,:,2*channel-1);
-            topo.z = topo.z_all(:, 1:max(y_coordinates)-1);
+% Extract out the channels
+for channel = 1:number_channels
+    if channelSelection(channel).selected
+        fieldName = channelSelection(channel).fieldName;
+        channelDataAll = data(:, :, 2*channel-1);
+        channelDataBackwardAll = data(:, :, 2*channel);
 
-            topo.z_backward_all = data(:,:,2*channel);
-            topo.z_backward = topo.z_backward_all(:, 1:max(y_coordinates)-1);
-
-            %Apply orientation transformation
-            [topo.z_all, topo.z_backward_all] = sxmPermute(topo.z_all, topo.z_backward_all, topo.header.scan_dir);
-            [topo.z, topo.z_backward] = sxmPermute(topo.z, topo.z_backward, topo.header.scan_dir);
-
-        elseif channels(channel) == "Current"
-            topo.I_all = data(:,:,2*channel-1);
-            topo.I = topo.I_all(:, 1:max(y_coordinates)-1);
-
-            topo.I_backward_all = data(:,:,2*channel);
-            topo.I_backward = topo.I_backward_all(:, 1:max(y_coordinates)-1);
+        if unfinished
+            channelData = channelDataAll(:, 1:max(y_coordinates)-1);
+            channelDataBackward = channelDataBackwardAll(:, 1:max(y_coordinates)-1);
 
             %Apply orientation transformation
-            [topo.I_all, topo.I_backward_all] = sxmPermute(topo.I_all, topo.I_backward_all, topo.header.scan_dir);
-            [topo.I, topo.I_backward] = sxmPermute(topo.I, topo.I_backward, topo.header.scan_dir);
+            [channelData, channelDataBackward] = sxmPermute(channelData, channelDataBackward, topo.header.scan_dir);
+            [channelDataAll, channelDataBackwardAll] = sxmPermute(channelDataAll, channelDataBackwardAll, topo.header.scan_dir);
 
-        elseif channels(channel) == "LI_D1_X_1_omega"
-            topo.lock_in_all = data(:,:,2*channel-1);
-            topo.lock_in = topo.lock_in_all(:, 1:max(y_coordinates)-1);
-
-            topo.lock_in_backward_all = data(:,:,2*channel);
-            topo.lock_in_backward = topo.lock_in_backward_all(:, 1:max(y_coordinates)-1);
-
-            %Apply orientation transformation
-            [topo.lock_in_all, topo.lock_in_backward_all] = sxmPermute(topo.lock_in_all, topo.lock_in_backward_all, topo.header.scan_dir);
-            [topo.lock_in, topo.lock_in_backward] = sxmPermute(topo.lock_in, topo.lock_in_backward, topo.header.scan_dir);
-
+            topo.(fieldName) = channelData;
+            topo.(fieldName + "_backward") = channelDataBackward;
+            topo.(fieldName + "_all") = channelDataAll;
+            topo.(fieldName + "_backward_all") = channelDataBackwardAll;
         else
-            topo.other_channel_all = data(:,:,2*channel-1);
-            topo.other_channel = topo.other_channel_all(:, 1:max(y_coordinates)-1);
-
-            topo.other_channel_backward_all = data(:,:,2*channel);
-            topo.other_channel_backward = topo.other_channel_backward_all(:, 1:max(y_coordinates)-1);
-
             %Apply orientation transformation
-            [topo.other_channel_all, topo.other_channel_backward_all] = sxmPermute(topo.other_channel_all, topo.other_channel_backward_all, topo.header.scan_dir);
-            [topo.other_channel, topo.other_channel_backward] = sxmPermute(topo.other_channel, topo.other_channel_backward, topo.header.scan_dir);
+            [channelDataAll, channelDataBackwardAll] = sxmPermute(channelDataAll, channelDataBackwardAll, topo.header.scan_dir);
+
+            topo.(fieldName) = channelDataAll;
+            topo.(fieldName + "_backward") = channelDataBackwardAll;
         end
     end
 end
-
 
 end
 
